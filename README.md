@@ -20,7 +20,19 @@
 # Documentation
 
 [Read the Docs](https://chessengine.readthedocs.io)
-# Dependencies
+# Chess and Bitboards
+
+Bitboards are an interesting method of representing a chess board invented in Russia (with the program Kaissa, circa 1977). They were made widely popular by Robert Hyatt and his program Crafty, a direct derivatve of "Cray Blitz" written circa 1985, which he had made open source. The basic idea is that we are going to be exploiting the coincidental fact that a chess board has 64 squares and that modern computers can easily manipulate 64-bit integers.
+
+So what are the motivations of bitboards? One of them is memory compaction of the state of the board and of possible future boards.
+Another is that many questions about movement and capturing of pieces can be answered "in parallel" by __OR__ing, __AND__ing, __XOR__ing, and __shifting__ various bitboards instead of building _complex_ _data_ _structures_ in memory to hold views of the board by certain pieces and valid movement spaces and then _sets_ of those data structures for __AI__ exploration of the movement space.
+
+When I went looking for _bitboard_ _algorithms_ on the web, I found a lot of material. However, I did not find satisfaction in the explanations of most of these pages and no one really had enough knowledge or sufficient detail in one spot to actually write a _chess_ _engine_ based on the concept of bitboards.
+So, these pages are an attempt to condense the knowledge I've learned along with numerous detailed visual explanations of the concepts involved as to help not only myself, but others, to intuitively understand bitboards.
+I've specifically written the material towards clarity and a full blown chess engine might very well optimize many steps or bit operations away.
+Also, the default language I will write various statements and expressions in will be __C__.
+[Read More about
+Bitboards](http://pages.cs.wisc.edu/~psilord/blog/data/chess-pages/)
 
 # How to Install
 

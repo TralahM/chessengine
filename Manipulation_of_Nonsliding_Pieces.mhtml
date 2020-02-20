@@ -1,0 +1,1381 @@
+<html>
+<head>
+<title>
+Manipulation of Nonsliding Pieces
+</title>
+<style type="text/css"><!--
+table.container {
+	border-collapse: collapse;
+}
+table.container tr td {
+	text-align: center;
+}
+table.container colgroup {
+}
+table.square {
+	border-collapse: collapse;
+}
+table.square tr td {
+	height: 1.4em;
+	text-align: center;
+	border: 2px solid #AAAAAA;
+}
+table.square colgroup {
+	width: 1.4em;
+}
+--></style>
+</head>
+
+<body>
+
+<h1>Nonsliding Pieces</h1>
+
+<h2>Why nonsliding?</h2>
+<p>
+The nonsliding piece on the chess board are the <strong>King, Knight,</strong>
+and <strong>Pawn</strong>. We differentiate them from the other sliding
+pieces since the algorithms for nonsliding pieces are simpler to understand
+and compute than for sliding pieces. Technically the pawn is also a sliding
+piece under very special circumstances, but we can still treat it as if it
+was a nonsliding piece.
+</p>
+
+<p>
+While many bitboard algorithms can be computed with nonsliding pieces,
+we are currently only interested in the most basic of computation such as
+where can a piece move, where can it attack, and the combination of those
+two resulting in the valid moves for the piece. The valid moves shall be
+congnizant of other pieces on the board as well, as a pawn can't move to a
+place that holds or attack another piece of the same color. At this point,
+we aren't worried about a piece moving into danger as detection of that
+is talked about later.
+</p>
+
+
+<h2>Resolution of Valid Moves</h2>
+<p>
+So how do we start to formulate how to determine the valid moves
+for a nonsliding piece in the context of a board containing multiple
+pieces? For example, a white piece can not attack another white piece,
+nor move there.  We will see how step by step the information from the
+lookup tables are joined and then filtered by what is actually on the
+board to produce true valid moves.
+</p>
+
+<p>
+The bitboards that we will be ultimately computing
+are: <strong>WhiteKingValid, BlackKindValid,
+WhiteKnightValid, BlackKnightValid, WhitePawnValid,</strong> and
+<strong>BlackPawnValid</strong>. The differences in the algorithms between
+different colors of the same piece style are very regular--mainly
+shifting direction and changing which color side's pieces affect the
+current piece in question. 
+</p>
+
+<p>
+These bitboard computations shall only be for <strong>specific</strong>
+pieces on the chess board such that a human might specify when playing
+against another human player. However, it will be shown later how it is
+possible to use these algorithms for <emph>all</emph> the pieces of the
+same kind and color on the board at the same time.
+</p>
+
+<p>
+<strong>WARNING: For the purposes of the discussion on this page: check,
+checkmate detection, and valid castling moves concerning the king's
+(of any color) computed valid moves and en passant of a pawn will be
+delayed until later in this tutorial, where we will revisit them and
+complete their description.</strong>
+</p>
+
+<h3>Movement of the King</h3>
+
+<p>
+Inspection of the King (of any color) shows us that a white and black
+king move identically (with respect to their color) when placed on the
+same square on a chess board. We are going to mark every place an arbitrary
+king can move with a number so we can see how to calculate each location
+to see if it is available for movement or attacking and then logcally OR them
+all together to form the valid movement bitboard. Here is the numbering
+scheme for the King with its positional bitboard on the right.
+<table class="container">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td><table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">1</td>
+   <td style="background-color: rgb(255, 255, 255);">2</td>
+   <td style="background-color: rgb(192, 192, 192);">3</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">8</td>
+   <td style="background-color: rgb(192, 192, 192);">K</td>
+   <td style="background-color: rgb(255, 255, 255);">4</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">7</td>
+   <td style="background-color: rgb(255, 255, 255);">6</td>
+   <td style="background-color: rgb(192, 192, 192);">5</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+  </tr>
+</table>
+   </td>
+   <td><table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">1</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+</table>
+   </td>
+  </tr>
+</table>
+</p>
+
+<p>
+So, suppose I wanted to see if the king, suppose white, could move
+into spot 8, I could take the above bitboard and shift it right
+<strong>(because a shift right is toward the LSB side of the 64 bit
+integer, remember the representation!)</strong> 1 bit. The green location
+is the new bitboard which represents a possible movement left, the yellow
+location is where the king used to be, for our reference. We could now
+take this bitboard and logically AND it against the complement of all
+of the white pieces to see if the king could actually move to spot 8.
+
+<table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(255, 255, 128);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+</table>
+</p>
+
+<p>
+We will do something similar for all of the rest of the spots by shifting
+the position of the king the correct number of bits to mark off another
+spot it could have moved to on the board and then logically ORing all
+of those partial spot movement boards together. But what about if the
+King is in file A? Surely a shift right by one bit will create a place
+the king cannot move (incorrect move marked in blue):
+<table class="container">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td><table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">1</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+</table>
+   </td>
+   <td><table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 128);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(192, 192, 255);">1</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+</table>
+   </td>
+  </tr>
+</table>
+</p>
+
+<p>
+We solve this by simply clearing the king from file A (if it happens to
+be there) when performing the checks for spots 1, 8, and 7, and clearing
+the king from file H (if it happens to be there) checking for spots 3,
+4, and 5. If the king gets cleared out, then a bitboard full of zeros is
+made upon which any shifting in any direction still produces a bitboard
+full of zeros, and that means no valid move in this context. So for the
+above example for the computation of spot 8 when a king is on A4:
+
+<table class="container">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td><table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">1</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+</table>
+   </td>
+   <td><strong>AND</strong></td>   <td><table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(192, 192, 255);">0</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 255);">0</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 255);">0</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 255);">0</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 255);">0</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 255);">0</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 255);">0</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 255);">0</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+   <td style="background-color: rgb(128, 255, 128);">1</td>
+  </tr>
+</table>
+   </td>
+   <td><strong>=</strong></td>   <td><table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+</table>
+   </td>
+  </tr>
+</table>
+
+Then take the resultant bitboard from the operation above (which is empty)
+and shift it right one bit, which ends up being:
+
+<table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+</table>
+
+Hence, no allowable movement for spot 8.
+</p>
+
+<p>
+For spots 2 and 6, (technically spots 1, 2, 3 and 5, 6, 7) we don't have
+to do anything with respect to the ranks because if the shifting of the
+bitboard takes the physical location off of the board either on the white
+side or the black side due to shifting too far, then we are simply left
+with a bitboard of all zeros--no valid moves. This is precisely what
+we want.
+</p>
+
+<p>
+Given the above information, here is how we extend it to calculate every
+possible position of movement and attack for any color king. 
+</p>
+
+<p>
+<pre>
+/* LookupTables is a structure which contains all precomputed lookup tables */
+Bitboard compute_king_incomplete(Bitboard king_loc, Bitboard own_side, LookupTables *tbls)
+{
+	/* we can ignore the rank clipping since the overflow/underflow with
+		respect to rank simply vanishes. We only care about the file
+		overflow/underflow. */ 
+
+	king_clip_file_h = king_loc & tbls->ClearFile[FILE_H]; 
+	king_clip_file_a = king_loc & tbls->ClearFile[FILE_A]; 
+
+	/* remember the representation of the board in relation to the bitindex 
+		when looking at these shifts.... */
+	spot_1 = king_clip_file_h << 7; 
+	spot_2 = king_loc << 8; 
+	spot_3 = king_clip_file_h << 9; 
+	spot_4 = king_clip_file_h << 1; 
+
+	spot_5 = king_clip_file_a >> 7; 
+	spot_6 = king_loc >> 8; 
+	spot_7 = king_clip_file_a >> 9; 
+	spot_8 = king_clip_file_a >> 1; 
+
+	king_moves = spot_1 | spot_2 | spot_3 | spot_4 | spot_5 | spot_6 |
+                    	spot_7 | spot_8; 
+
+	KingValid = king_moves & ~own_side; 
+
+	/* compute only the places where the king can move and attack. The caller
+		will interpret this as a white or black king. */
+	return KingValid;
+}
+</pre>
+</p>
+
+<p>
+The important thing to realize above is that we are using the bitboard of
+the position of the king <strong>itself</strong> as the seed value for
+the calculation of the masks for movement determination.
+</p>
+
+<p>
+Here is an example for how you'd call the above function to determine
+how a White King on E1 could move if it knew where all of its white
+pieces were:
+</p>
+
+<p>
+<pre>
+WhiteKingValid = compute_king_incomplete(Piece[E1], AllWhitePieces, lookup_tables);
+</pre>
+</p>
+
+<p>
+Here is a <a href="./whitekingvalid_incomplete.html">detailed</a> 
+visualization of the above code for a White King at E1 on a sample
+board filled with other pieces.
+</p>
+
+<h3>BlackKingValid</h3>
+
+<p>
+You'll notice that the code for this case is almost identical than for the
+above case. I can use the same exact function call above to compute a
+Black King on F4 instead:
+</p>
+
+<p>
+<pre>
+BlackKingValid = compute_king_incomplete(Piece[F4], AllBlackPieces, lookup_tables);
+</pre>
+</p>
+
+<p>
+Here is a <a href="./blackkingvalid_incomplete.html">detailed</a> 
+visualization of the above code for a Black King at F4 on a sample
+board filled with other pieces.
+</p>
+
+<h3>WhiteKnightValid</h3>
+
+<p>
+We will use the same technique as above to compute how a knight moves.
+We can also use the same algorithm for both the white and black nights since
+they move identically (with repsect to their own kind) when a knight of
+each color is placed onto the same square. Here is a labelling of each spot
+a knight can move or attack with the knight's position bitboard on the right:
+<table class="container">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td><table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">2</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">3</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">1</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">4</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">N</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">8</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">5</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">7</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">6</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+   <td style="background-color: rgb(192, 192, 192);">&nbsp;</td>
+   <td style="background-color: rgb(255, 255, 255);">&nbsp;</td>
+  </tr>
+</table>
+   </td>
+   <td><table class="square">
+ <colgroup span="8"></colgroup>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">1</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+  <tr>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+   <td style="background-color: rgb(255, 255, 255);">0</td>
+  </tr>
+</table>
+   </td>
+  </tr>
+</table>
+</p>
+
+<p>
+The only new concept is an extension of the clipping procedure that we
+learned from the king algorithm. The Knight has two overflow files instead of
+one. For example, if a white knight was in location B4, spots 1 and 8 would
+be clipped out (otherwise the shift to compute them will rollover to the other
+side of the board). If the white knight was on A4, then spots 1, 2, 7, and 8
+would all be clipped. The below algorithm explicitly takes care of clipping
+files A, B, and G, H for each individual movement/attack spot.
+</p>
+
+<p>
+<pre>
+/* LookupTables is a structure which contains all precomputed lookup tables */
+Bitboard compute_knight(Bitboard knight_loc, Bitboard own_side, LookupTables *tbls)
+{
+	/* we can ignore the rank clipping since the overflow/underflow with
+		respect to rank simply vanishes. We only care about the file
+		overflow/underflow which is much more work for a knight. */ 
+	
+	spot_1_clip = tbls->ClearFile[FILE_A] & tbls->ClearFile[FILE_B];
+	spot_2_clip = tbls->ClearFile[FILE_A];
+	spot_3_clip = tbls->ClearFile[FILE_H];
+	spot_4_clip = tbls->ClearFile[FILE_H] & tbls->ClearFile[FILE_G];
+
+	spot_5_clip = tbls->ClearFile[FILE_H] & tbls->ClearFile[FILE_G];
+	spot_6_clip = tbls->ClearFile[FILE_H];
+	spot_7_clip = tbls->ClearFile[FILE_A];
+	spot_8_clip = tbls->ClearFile[FILE_A] & tbls->ClearFile[FILE_B];
+
+	/* The clipping masks we just created will be used to ensure that no
+		under or overflow positions are computed when calculating the
+		possible moves of the knight in certain files. */
+
+	spot_1 = (knight_loc & spot_1_clip) << 6;
+	spot_2 = (knight_loc & spot_2_clip) << 15;
+	spot_3 = (knight_loc & spot_3_clip) << 17;
+	spot_4 = (knight_loc & spot_4_clip) << 10;
+
+	spot_5 = (knight_loc & spot_5_clip) >> 6;
+	spot_6 = (knight_loc & spot_6_clip) >> 15;
+	spot_7 = (knight_loc & spot_7_clip) >> 17;
+	spot_8 = (knight_loc & spot_8_clip) >> 10;
+
+	KnightValid = spot_1 | spot_2 | spot_3 | spot_4 | spot_5 | spot_6 |
+                    spot_7 | spot_8;
+
+	/* compute only the places where the knight can move and attack. The
+		caller will determine if this is a white or black night. */
+	return KnightValid & ~own_side;
+}
+</pre>
+</p>
+
+<p>
+It would be invoked like this for a White Knight on B4:<br>
+<pre>
+WhiteKnightValid = compute_knight(Piece[B4], AllWhitePieces, lookup_tables);
+</pre>
+</p>
+
+<p>
+Here is a <a href="./whiteknightvalid.html">detailed</a> 
+visualization of the above code for a White Knight at B4 on a sample
+board filled with other pieces.
+</p>
+
+<h3>BlackKnightValid</h3>
+
+<p>
+You'll notice that the code for this case is almost identical than for the
+above case. I can use the same exact function call above to compute a
+Black Knight on D4 instead:
+</p>
+
+<p>
+<pre>
+BlackKnightValid = compute_knight(Piece[D4], AllBlackPieces, lookup_tables);
+</pre>
+</p>
+
+<p>
+Here is a <a href="./blackknightvalid.html">detailed</a> 
+visualization of the above code for a Black Knight at D4 on a sample
+board filled with other pieces.
+</p>
+
+
+<h3>WhitePawnValid</h3>
+<p>
+How would we compute the valid movements of the pawn at D2? These
+particular algorithms are shift sensitive. Meaning if I was asking
+about a black pawn, I will have to flip the shifts to be the other
+direction (along with a few other change, like <strong>AllBlackPieces</strong>
+becoming <strong>AllWhitePieces</strong>).
+
+<!-- Change white_pawn_d2 to WhitePawns to make this work for ALL pawns -->
+
+<pre>
+
+/* unlike the king and knight algorithms, pawns move in fundamentally
+	different ways for each color, so we need to seperate functions to
+	deal with the change in shifting and the opponents color. This is
+	the one for computing a white pawn movement. */
+Bitboard compute_white_pawns(Bitboard white_pawn_loc, Bitboard all_pieces,
+	Bitboard all_black_pieces, LookupTables *lbts)
+{
+	/* check the single space infront of the white pawn */
+	white_pawn_one_step = (white_pawn_loc << 8) & ~all_pieces; 
+
+	/* for all moves that came from rank 2 (home row) and passed the above 
+		filter, thereby being on rank 3, check and see if I can move forward 
+		one more */
+	white_pawn_two_steps = 
+		((white_pawn_one_step & MaskRank[RANK_3]) << 8) & ~all_pieces; 
+
+	/* the union of the movements dictate the possible moves forward 
+		available */
+	white_pawn_valid_moves = white_pawn_one_step | white_pawn_two_steps;
+
+	/* next we calculate the pawn attacks */
+
+	/* check the left side of the pawn, minding the underflow File A */
+	white_pawn_left_attack = (white_pawn_loc & ClearFile[FILE_A]) << 7;
+
+	/* then check the right side of the pawn, minding the overflow File H */
+	white_pawn_right_attack = (white_pawn_loc & ClearFile[FILE_H]) << 9;
+
+	/* the union of the left and right attacks together make up all the 
+		possible attacks */
+	white_pawn_attacks = white_pawn_left_attack | white_pawn_right_attack;
+
+	/* Calculate where I can _actually_ attack something */
+	white_pawn_valid_attacks = white_pawn_attacks & all_black_pieces;
+
+	/* then we combine the two situations in which a white pawn can legally 
+		attack/move. */
+	WhitePawnValid = white_pawn_valid_moves | white_pawn_valid_attacks;
+
+	return WhitePawnValid;
+}
+</pre>
+
+<p>
+It would be invoked like this for a White Pawn on B2:<br>
+<pre>
+WhitePawnValid = compute_white_pawn(Piece[B2], AllPieces, AllBlackPieces, lookup_tables);
+</pre>
+</p>
+
+<p>
+Uh, what just happened? 
+</p>
+
+<p>
+We'll slowly dissect the expressions above so you can see visually
+what happens. A pawn takes some work to compute because it is the
+only piece that can move to a square it can't attack and can attack
+when there is a square occupied by an opponent to which it cannot move
+otherwise in addition to special movement rules for the initial move. We
+<strong>must</strong> keep these kinds of constraints when bitboard
+algorithms are designed.
+</p>
+
+<p>
+Here it is in <a href="./whitepawnvalid_incomplete.html">slow motion</a>. 
+</p>
+
+</p>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
