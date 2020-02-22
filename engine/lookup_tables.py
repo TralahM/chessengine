@@ -1,4 +1,29 @@
+#!env python
+# -*- coding: utf-8 -*-
+"""
+=======================================================================
+:AUTHOR:	 Tralah M Brian <briantralah@tralahtek.com>
+:TWITTER: 	 @TralahM <https://twitter.com/TralahM>
+:GITHUB: 	 <https://github.com/TralahM>
+:KAGGLE: 	 <https://kaggle.com/TralahM>
+:COPYRIGHT:  (c) 2020  TralahTek LLC.
+:LICENSE: 	 MIT , see LICENSE for more details.
+:WEBSITE:	<https://www.tralahtek.com>
+:CREATED: 	2020-02-22  03:56
+
+:FILENAME:	lookup_tables.py
+=======================================================================
+
+
+    DESCRIPTION OF lookup_tables MODULE:
+
+Bit Masks for Manipulating Bitboard Data Structures
+"""
+
 from bitboard import Bitboard
+
+EMPTY_BB = Bitboard()
+FULL_BB = ~Bitboard()
 
 
 def clear_rank(i: int):
