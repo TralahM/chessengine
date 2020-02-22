@@ -53,3 +53,8 @@ def mask_file(i: int):
 
 def piece(loc: int):
     return Bitboard(f'{2**loc:064b}')
+
+
+def compute_king_incomplete(king_loc, own_side):
+    # TODO
+    pass
