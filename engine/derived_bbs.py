@@ -43,3 +43,7 @@ BlackKnights = lookup_tables.piece(
     lookup_tables.B8) | lookup_tables.piece(lookup_tables.G8)
 BlackQueens = lookup_tables.piece(lookup_tables.D8)
 BlackKing = lookup_tables.piece(lookup_tables.E8)
+
+AllBlackPieces = BlackPawns | BlackRooks | BlackBishops | BlackKnights | BlackQueens | BlackKing
+AllWhitePieces = WhitePawns | WhiteRooks | WhiteBishops | WhiteKnights | WhiteQueens | WhiteKing
+AllPieces = AllBlackPieces | AllWhitePieces
