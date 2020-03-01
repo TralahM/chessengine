@@ -21,6 +21,20 @@
 
 [Read the Docs](https://chessengine.readthedocs.io)
 # Chess and Bitboards
+## Information to be Stored
+- Board Position (location of all pieces)
+- En-passant square if any
+- Castling Permissions
+- Draw by repetion/ 50-move stats (often stored outside the board structure)
+- Side to move
+### Expectated size
+- 12 Bitboards (12*64 bits)
+- Castling (4 bits)
+- Side to move (1 bit)
+- E-P square (6 bits)
+
+Total 779 bits (98 bytes)
+## Representation
 
 Bitboards are an interesting method of representing a chess board invented in Russia (with the program Kaissa, circa 1977). They were made widely popular by Robert Hyatt and his program Crafty, a direct derivatve of "Cray Blitz" written circa 1985, which he had made open source. The basic idea is that we are going to be exploiting the coincidental fact that a chess board has 64 squares and that modern computers can easily manipulate 64-bit integers.
 
