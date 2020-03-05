@@ -49,12 +49,36 @@ class King(Piece):
         self.whites = "♔"
         self.blacks = "♚"
 
+    def __str__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
+
+    def __repr__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
+
 
 class Queen(Piece):
     def __init__(self, color: int):
         self.color = color
         self.whites = "♕"
         self.blacks = "♛"
+
+    def __str__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
+
+    def __repr__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
 
 
 class Rook(Piece):
@@ -64,6 +88,18 @@ class Rook(Piece):
         self.blacks = "♜"
         self.kingside = kingside
 
+    def __str__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
+
+    def __repr__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
+
 
 class Bishop(Piece):
     def __init__(self, color: int, kingside: int):
@@ -71,6 +107,18 @@ class Bishop(Piece):
         self.whites = "♗"
         self.blacks = "♝"
         self.kingside = kingside
+
+    def __str__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
+
+    def __repr__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
 
 
 class Knight(Piece):
@@ -80,6 +128,18 @@ class Knight(Piece):
         self.blacks = "♞"
         self.kingside = kingside
 
+    def __str__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
+
+    def __repr__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
+
 
 class Pawn(Piece):
     def __init__(self, color: int, fileid: str):
@@ -87,3 +147,15 @@ class Pawn(Piece):
         self.whites = "♙"
         self.blacks = "♟"
         self.fileid = fileid
+
+    def __str__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
+
+    def __repr__(self):
+        if self.color:
+            return self.whites
+        else:
+            return self.blacks
