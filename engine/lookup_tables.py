@@ -57,6 +57,14 @@ def mask_file(i: int) -> Bitboard:
     return Bitboard(f'{sum([2**i for i in range(i-1,64,8)]):064b}')
 
 
+def mask_diagonal(i: int):
+    pass
+
+
+def mask_antidiagonal(i: int):
+    pass
+
+
 def piece(loc: int) -> Bitboard:
     return Bitboard(f'{2**loc:064b}')
 
